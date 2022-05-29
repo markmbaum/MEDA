@@ -1,9 +1,10 @@
+#%%
 from os import walk
 from os.path import join
 from pandas import read_csv, concat
 from numpy import *
 
-#------------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 
 #calibrated data directory
 dircal = join('..', 'data', 'raw', 'calibrated', 'data_calibrated_env')
@@ -62,22 +63,16 @@ keyscal = {
     ]
 }
 
-#------------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 
 def lower_cols(df):
     df.columns = [c.lower() for c in df.columns]
-    return None
+    return(None)
 
-def tofloat32(df):
-    for col in df:
-        if df[col].dtype is dtype('float64'):
-            df[col] = df[col].astype(float32)
-    return None
-
-def handlenull(df):
+def handle_null(df):
     #this value is specified in readme.txt and does appear in some tables
     df.replace(9999999999, nan, inplace=True)
-    return None
+    return(None)
 
 def split_datetime(df):
     col = ['sec', 'min', 'hr', 'sol']
@@ -87,7 +82,13 @@ def split_datetime(df):
     df.drop('ltst', axis=1, inplace=True)
     return None
 
-def read_tables(datadir, datakeys):
+def process(df):
+    lower_cols(df)
+    handle_null(df)
+    split_datetime(df)
+    return(None)
+
+def extract_tables(datadir, datakeys, prefix, dirout):
     #empty dictionary of lists to get started
     tables = {k:[] for k in datakeys}
     #scan for csv files
@@ -97,19 +98,19 @@ def read_tables(datadir, datakeys):
                 if (k in fn) and ('.csv' in fn.lower()):
                     df = read_csv(join(root, fn))
                     tables[k].append(df[datakeys[k]])
-    #stack all the portions of each table
     for k in tables:
+        #stack all the portions 
         tables[k] = concat(tables[k], axis=0, ignore_index=True)
-    return tables
+        #do some initial processing
+        process(tables[k])
+        #write to file
+        p = join(dirout, prefix + '_' + k + '.feather')
+        tables[k].to_feather(p)
+        print('file written:', p)
+    return(None)
 
-#------------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 
-#read and combine data tables
-tables = read_tables(dircal, keyscal)
-#make the columns lower case and split the timestamp
-for k in tables:
-    df = tables[k]
-    lower_cols(df)
-    split_datetime(df)
-    handlenull(df)
-    tofloat32(df)
+extract_tables(dircal, keyscal, 'calibrated', dirout)
+
+extract_tables(dirder, keysder, 'derived', dirout)
